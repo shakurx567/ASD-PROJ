@@ -176,9 +176,9 @@ class MainWindow:
         elif role == "Maintenance Staff":
             return ["🏠   Dashboard", "🔧   Maintenance Requests", "✅   Update Status", "💰   Log Costs"]
         elif role == "Administrator":
-            return ["🏠   Dashboard", "👤   Tenants", "🏢   Apartments", "💳   Payments", "🔧   Maintenance", "📊   Reports", "👥   Manage Users"]
+            return ["🏠   Dashboard", "👤   Tenants", "🏢   Apartments", "📄   Leases", "💳   Payments", "🔧   Maintenance", "📊   Reports", "👥   Manage Users"]
         elif role == "Manager":
-            return ["🏠   Dashboard", "👤   Tenants", "🏢   Apartments", "💳   Payments", "🔧   Maintenance", "📊   Reports", "👥   Manage Users", "🌍   All Locations", "➕   Add City"]
+            return ["🏠   Dashboard", "👤   Tenants", "🏢   Apartments", "📄   Leases", "💳   Payments", "🔧   Maintenance", "📊   Reports", "👥   Manage Users", "🌍   All Locations", "➕   Add City"]
         return ["🏠   Dashboard"]
 
     def get_command(self, item):
@@ -188,6 +188,18 @@ class MainWindow:
             return self.show_dashboard
         elif "Add City" in item:
             return self.show_add_city
+        elif "Register Tenant" in item or item.strip().endswith("Tenants") or "View Tenant" in item:
+            return self.show_tenants
+        elif "Apartments" in item:
+            return self.show_apartments
+        elif "Lease" in item:
+            return self.show_leases
+        elif "Record Payment" in item or "Payments" in item or "Generate Invoice" in item:
+            return self.show_payments
+        elif "Financial Reports" in item or "Reports" in item or "All Locations" in item:
+            return self.show_reports
+        elif "Maintenance" in item or "Update Status" in item or "Log Costs" in item:
+            return self.show_maintenance
         else:
             return lambda i=item: self.show_placeholder(i)
 
@@ -199,7 +211,50 @@ class MainWindow:
         from ui.add_city import AddCityScreen
         AddCityScreen(self.content)
 
+    def show_tenants(self):
+        from ui.tenant_management import TenantManagementScreen
+        TenantManagementScreen(self.content)
+
+    def show_apartments(self):
+        from ui.apartment_management import ApartmentManagementScreen
+        ApartmentManagementScreen(self.content)
+
+    def show_leases(self):
+        from ui.lease_management import LeaseManagementScreen
+        LeaseManagementScreen(self.content)
+
+    def show_payments(self):
+        from ui.payment_billing import PaymentBillingScreen
+        PaymentBillingScreen(self.content)
+
+    def show_maintenance(self):
+        from ui.maintenance_screen import MaintenanceScreen
+        MaintenanceScreen(self.content, main_window=self)
+
+    def show_reports(self):
+        from ui.reports_screen import ReportsScreen
+        ReportsScreen(self.content)
+
+    def _load_live_notifications(self):
+        try:
+            from dao.lease_dao import LeaseDAO
+            from dao.invoice_dao import InvoiceDAO
+            expiring = LeaseDAO.get_expiring_leases(30)
+            for lease in expiring:
+                msg = f"Lease expiring {lease['end_date']}: {lease['tenant_name']} — {lease['apartment_name']}"
+                if not any(n["message"] == msg for n in self.notifications):
+                    self.notifications.append({"priority": "🟡 NORMAL", "message": msg, "read": False})
+            overdue = InvoiceDAO.get_overdue_invoices()
+            for inv in overdue:
+                msg = f"Overdue invoice #{inv['invoice_id']}: {inv['tenant_name']} — £{inv['amount']:,.0f}"
+                if not any(n["message"] == msg for n in self.notifications):
+                    self.notifications.append({"priority": "🔴 URGENT", "message": msg, "read": False})
+            self.update_bell()
+        except Exception:
+            pass
+
     def show_dashboard(self):
+        self._load_live_notifications()
         for w in self.content.winfo_children():
             w.destroy()
 
